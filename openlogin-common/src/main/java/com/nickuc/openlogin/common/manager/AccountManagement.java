@@ -26,7 +26,7 @@ package com.nickuc.openlogin.common.manager;
 
 import com.nickuc.openlogin.common.database.Database;
 import com.nickuc.openlogin.common.model.Account;
-import com.nickuc.openlogin.common.security.hashing.BCrypt;
+import com.nickuc.openlogin.common.security.hashing.Sha256;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 
@@ -52,13 +52,10 @@ public class AccountManagement {
      */
     public boolean comparePassword(@NonNull Account account, @NonNull String password) {
         String hashedPassword = account.getHashedPassword();
-        if (hashedPassword == null) {
+        if (hashedPassword == null || !hashedPassword.startsWith("$SHA$")) {
             return false;
         }
-        if (!hashedPassword.startsWith("$2")) {
-            throw new IllegalArgumentException("Invalid hashed password for " + account.getRealName() + "! " + hashedPassword);
-        }
-        return BCrypt.checkpw(password, hashedPassword);
+        return Sha256.verify(password, hashedPassword);
     }
 
     /**
@@ -110,15 +107,15 @@ public class AccountManagement {
      * @return optional of {@link Account}
      */
     public Optional<Account> search(@NonNull String name) {
-        try (Database.Query query = database.query("SELECT * FROM `openlogin` WHERE `name` = ?", name.toLowerCase())) {
+        try (Database.Query query = database.query("SELECT * FROM `authme` WHERE `username` = ?", name.toLowerCase())) {
             ResultSet resultSet = query.resultSet;
             if (resultSet.next()) {
                 String realName = resultSet.getString("realname");
                 String hashedPassword = resultSet.getString("password");
-                String address = resultSet.getString("address");
+                String ip = resultSet.getString("ip");
                 long lastLogin = resultSet.getLong("lastlogin");
                 long regdate = resultSet.getLong("regdate");
-                return Optional.of(new Account(realName, hashedPassword, address, lastLogin, regdate));
+                return Optional.of(new Account(realName, hashedPassword, ip, lastLogin, regdate));
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -164,7 +161,7 @@ public class AccountManagement {
         try {
             if (exists) {
                 database.update(
-                        "UPDATE `openlogin` SET `password` = ?, `address` = ?, `lastlogin` = ? WHERE `name` = ?",
+                        "UPDATE `authme` SET `password` = ?, `ip` = ?, `lastlogin` = ? WHERE `username` = ?",
                         hashedPassword,
                         address == null ? "127.0.0.1" : address,
                         current,
@@ -172,7 +169,7 @@ public class AccountManagement {
                 );
             } else {
                 database.update(
-                        "INSERT INTO `openlogin` (`name`, `realname`, `password`, `address`, `lastlogin`, `regdate`) VALUES (?, ?, ?, ?, ?, ?)",
+                        "INSERT INTO `authme` (`username`, `realname`, `password`, `ip`, `lastlogin`, `regdate`) VALUES (?, ?, ?, ?, ?, ?)",
                         name.toLowerCase(),
                         name,
                         hashedPassword,
@@ -201,7 +198,7 @@ public class AccountManagement {
         }
 
         try {
-            database.update("DELETE FROM `openlogin` WHERE `name` = ?", name.toLowerCase());
+            database.update("DELETE FROM `authme` WHERE `username` = ?", name.toLowerCase());
             return true;
         } catch (SQLException e) {
             e.printStackTrace();

@@ -28,7 +28,7 @@ import com.nickuc.openlogin.bukkit.OpenLoginBukkit;
 import com.nickuc.openlogin.common.api.OpenLoginAPI;
 import com.nickuc.openlogin.common.manager.AccountManagement;
 import com.nickuc.openlogin.common.model.Account;
-import com.nickuc.openlogin.common.security.hashing.BCrypt;
+import com.nickuc.openlogin.common.security.hashing.Sha256;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 
@@ -58,8 +58,7 @@ public class OLBukkitAPI implements OpenLoginAPI {
 
     @Override
     public boolean update(@NonNull String player, @NonNull String password, String address, boolean replace) {
-        String salt = BCrypt.gensalt();
-        String hashedPassword = BCrypt.hashpw(password, salt);
+        String hashedPassword = Sha256.generate(password);
         return plugin.getAccountManagement().update(player, hashedPassword, address, replace);
     }
 }
